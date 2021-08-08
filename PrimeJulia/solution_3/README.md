@@ -149,11 +149,12 @@ This is the output from running the solution on a machine with an Intel
 Core i5-9300H CPU and 24 GB of RAM running Ubuntu 20.04 LTS under WSL2:
 
 ```
-PS D:\Office Files\Programming\Primes> julia primes_1of2.jl
+❯ julia main.jl
 Settings: sieve_size = 1000000 | duration = 5
+Benchmarking implementation: PrimeSieve1of2
 Number of trues: 78498
-primes_1of2.jl: Passes: 9146 | Elapsed: 5.0 | Passes per second: 1829.2 | Average pass duration: 0.0005466870763175158
-louie-github_port_1of2;9146;5.0;1;algorithm=base,faithful=yes,bits=1
+Passes: 10303 | Elapsed: 5.000010013580322 | Passes per second: 2060.5958732115423 | Average pass duration: 0.000485296516896081
+louie-github_PrimeSieve1of2;10303;5.000010013580322;1;algorithm=base,faithful=yes,bits=1
 ```
 
 On said machine, when no heavy tasks are running, the number of passes
