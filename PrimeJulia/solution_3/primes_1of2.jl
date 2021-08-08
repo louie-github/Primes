@@ -11,6 +11,14 @@
 # signatures containing `::Integer` to `::UInt` as well as patch the
 # count_primes and get_found_primes functions to use UInts.
 
+module Primes1of2
+export PrimeSieve1of2,
+       unsafe_find_next_factor_index,
+       unsafe_clear_factors!,
+       run_sieve!,
+       count_primes,
+       get_found_primes
+
 const MainUInt = UInt32
 const _uint_bit_length = sizeof(MainUInt) * 8
 const _div_uint_size_shift = Int(log2(_uint_bit_length))
@@ -27,7 +35,7 @@ const _div_uint_size_shift = Int(log2(_uint_bit_length))
 @inline _div_uint_size(i::Integer) = i >> _div_uint_size_shift
 
 
-struct PrimeSieve1of2 <: PrimeSieve
+struct PrimeSieve1of2
     sieve_size::UInt
     is_not_prime::Vector{MainUInt}
 end
@@ -128,4 +136,6 @@ function get_found_primes(sieve::PrimeSieve1of2)
         end
     end
     return output
+end
+
 end

@@ -1,13 +1,17 @@
-abstract type PrimeSieve end
-
-include("primes_1of2.jl")
+include("primes_1of2.jl") ; using .Primes1of2
 
 const IMPLEMENTATIONS = [
     PrimeSieve1of2
 ]
+const IMPLEMENTATION_NAMES = Set(string(i) for i in IMPLEMENTATIONS)
+# We use this instead of defining an abstract supertype since we want
+# each module to be as self-contained as possible. This is probably not
+# very clean nor extensible, so this might need to be changed sometime
+# in the future.
+AbstractPrimeSieve = Union{IMPLEMENTATIONS...}
 
 function main_benchmark(
-    PrimeSieveImplementation::Type{<:PrimeSieve},
+    PrimeSieveImplementation::Type{<:AbstractPrimeSieve},
     sieve_size::Integer,
     duration::Integer
 )
