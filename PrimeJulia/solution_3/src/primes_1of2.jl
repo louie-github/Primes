@@ -12,12 +12,7 @@
 # count_primes and get_found_primes functions to use UInts.
 
 module Primes1of2
-export PrimeSieve1of2,
-       unsafe_find_next_factor_index,
-       unsafe_clear_factors!,
-       run_sieve!,
-       count_primes,
-       get_found_primes
+export PrimeSieve1of2
 
 import ..PrimesSolution3
  
