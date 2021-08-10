@@ -79,7 +79,7 @@ end
     return max_index + 1
 end
 
-@inline function PrimesSolution3.unsafe_clear_factors!(
+function PrimesSolution3.unsafe_clear_factors!(
     sieve::PrimeSieveStripedBlocks,
     factor_index::Integer
 )
