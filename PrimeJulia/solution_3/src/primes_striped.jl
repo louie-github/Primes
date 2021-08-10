@@ -42,6 +42,23 @@ end
 # for testing in the REPL.
 PrimeSieveStripedBlocks(sieve_size::Int) = PrimeSieveStripedBlocks(UInt(sieve_size))
 
+@inline function unsafe_get_bit_at_zero_index(
+    sieve::PrimeSieveStripedBlocks, index::Integer
+)
+    if index > self.length_bits
+        return false
+    end
+    block_index = index / BLOCK_SIZE_BITS
+    offset = index % BLOCK_SIZE_BITS
+    bit_index = offset / BLOCK_SIZE
+    word_index = offset % BLOCK_SIZE
+    word = @inbounds sieve.blocks[block_index + 1][word_index + 1]
+    return !iszero(word & (1 << bit_index))
+end
+
+@inline unsafe_get_bit_at_index(
+    sieve::PrimeSieveStripedBlocks, index::Integer
+) = unsafe_get_bit_at_zero_index(sieve, index + 1)
 
 @inline function PrimesSolution3.unsafe_find_next_factor_index(
     arr::Vector{<:Unsigned},
