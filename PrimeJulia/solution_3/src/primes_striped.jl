@@ -58,7 +58,7 @@ end
 
 @inline unsafe_get_bit_at_index(
     sieve::PrimeSieveStripedBlocks, index::Integer
-) = unsafe_get_bit_at_zero_index(sieve, index + 1)
+) = unsafe_get_bit_at_zero_index(sieve, index - 1)
 
 @inline function PrimesSolution3.unsafe_find_next_factor_index(
     sieve::PrimeSieveStripedBlocks,
@@ -95,23 +95,53 @@ end
     bit_idx = offset_idx ÷ BLOCK_SIZE
     word_idx = offset_idx % BLOCK_SIZE
 
+    # Variables for unrolling loop
+    skip2 = skip * 2
+    skip3 = skip * 3
+    skip4 = skip * 4
+    BLOCK_SIZE_MINUS_SKIP3 = BLOCK_SIZE - skip3
+
     @inbounds while block_idx < num_blocks
         block = blocks[block_idx + 1]
         while bit_idx < UINT_BIT_LENGTH
             # Calculate length of current stripe, if it is less than
             # BLOCK_SIZE, then we know that this should be the last
             # iteration.
-            stripe_start_position = block_idx * BLOCK_SIZE_BITS + bit_idx * BLOCK_SIZE
-            effective_len = min(BLOCK_SIZE, sieve.length_bits - stripe_start_position)
+            # For some reason, 1 << bit_idx is faster than
+            # MainUInt(1) << bit_idx.
             mask = ~(1 << bit_idx)
-            # TODO: Check if loop unrolling helps here.
-            while word_idx < effective_len
-                block[word_idx + 1] &= mask
-                word_idx += skip
-            end
+            stripe_start_position = block_idx * BLOCK_SIZE_BITS + bit_idx * BLOCK_SIZE
+            effective_len = sieve.length_bits - stripe_start_position
             # Last iteration
-            if effective_len != BLOCK_SIZE
+            if effective_len < BLOCK_SIZE
+                unrolled_end_index = effective_len - skip3
+                if !(unrolled_end_index < effective_len)
+                    unrolled_end_index = 0
+                end
+                while word_idx < unrolled_end_index
+                    block[word_idx + 1] &= mask
+                    block[word_idx + skip + 1] &= mask
+                    block[word_idx + skip2 + 1] &= mask
+                    block[word_idx + skip3 + 1] &= mask
+                    word_idx += skip4
+                end
+                while word_idx < effective_len
+                    block[word_idx + 1] &= mask
+                    word_idx += skip
+                end
                 return
+            else
+                while word_idx < BLOCK_SIZE_MINUS_SKIP3
+                    block[word_idx + 1] &= mask
+                    block[word_idx + skip + 1] &= mask
+                    block[word_idx + skip2 + 1] &= mask
+                    block[word_idx + skip3 + 1] &= mask
+                    word_idx += skip4
+                end
+                while word_idx < BLOCK_SIZE
+                    block[word_idx + 1] &= mask
+                    word_idx += skip
+                end
             end
             bit_idx += 1
             word_idx -= BLOCK_SIZE
