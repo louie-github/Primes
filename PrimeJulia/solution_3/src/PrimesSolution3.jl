@@ -8,16 +8,22 @@ export unsafe_find_next_factor_index,
        get_found_primes,
 # Main exported names from module PrimesSolution3
        AbstractPrimeSieve,
-       benchmark_implementation
-
+       benchmark_implementation,
+# Exported implementations
+        PrimeSieve1of2
 
 abstract type AbstractPrimeSieve end
+function unsafe_find_next_factor_index end
+function unsafe_clear_factors! end
+function run_sieve!(::AbstractPrimeSieve) end
+function count_primes(::AbstractPrimeSieve) end
+function get_found_primes(::AbstractPrimeSieve) end
 
 include("primes_1of2.jl")
 using .Primes1of2
 
 const IMPLEMENTATIONS = [
-    PrimeSieve1of2
+    PrimeSieve1of2,
 ]
 const IMPLEMENTATION_NAMES = Set(string(i) for i in IMPLEMENTATIONS)
 

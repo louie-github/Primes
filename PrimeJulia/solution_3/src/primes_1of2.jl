@@ -19,8 +19,8 @@ export PrimeSieve1of2,
        count_primes,
        get_found_primes
 
-import ..AbstractPrimeSieve
-
+import ..PrimesSolution3
+ 
 const MainUInt = UInt32
 const _uint_bit_length = sizeof(MainUInt) * 8
 const _div_uint_size_shift = Int(log2(_uint_bit_length))
@@ -37,7 +37,7 @@ const _div_uint_size_shift = Int(log2(_uint_bit_length))
 @inline _div_uint_size(i::Integer) = i >> _div_uint_size_shift
 
 
-struct PrimeSieve1of2 <: AbstractPrimeSieve
+struct PrimeSieve1of2 <: PrimesSolution3.AbstractPrimeSieve
     sieve_size::UInt
     is_not_prime::Vector{MainUInt}
 end
@@ -61,7 +61,11 @@ end
 PrimeSieve1of2(sieve_size::Int) = PrimeSieve1of2(UInt(sieve_size))
 
 
-@inline function unsafe_find_next_factor_index(arr::Vector{<:Unsigned}, start_index::Integer, max_index::Integer)
+@inline function PrimesSolution3.unsafe_find_next_factor_index(
+    arr::Vector{<:Unsigned},
+    start_index::Integer,
+    max_index::Integer
+)
     # This loop calculates indices as if they are zero-based then adds
     # 1 when accessing the array since Julia uses 1-based indexing.
     zero_index = start_index
@@ -78,7 +82,11 @@ PrimeSieve1of2(sieve_size::Int) = PrimeSieve1of2(UInt(sieve_size))
     return max_index + 1
 end
 
-@inline function unsafe_clear_factors!(arr::Vector{<:Unsigned}, factor_index::Integer, max_index::Integer)
+@inline function PrimesSolution3.unsafe_clear_factors!(
+    arr::Vector{<:Unsigned},
+    factor_index::Integer,
+    max_index::Integer
+)
     factor = _map_to_factor(factor_index)
     # This function also uses zero-based indexing calculations similar
     # to unsafe_find_next_factor_index.
@@ -89,15 +97,17 @@ end
     end
 end
 
-function run_sieve!(sieve::PrimeSieve1of2)
+function PrimesSolution3.run_sieve!(sieve::PrimeSieve1of2)
     is_not_prime = sieve.is_not_prime
     sieve_size = sieve.sieve_size
     max_bits_index = _map_to_index(sieve_size)
     max_factor_index = _map_to_index(unsafe_trunc(UInt, sqrt(sieve_size)))
     factor_index = UInt(1) # 1 => 3, 2 => 5, 3 => 7, ...
     while factor_index <= max_factor_index
-        unsafe_clear_factors!(is_not_prime, factor_index, max_bits_index)
-        factor_index = unsafe_find_next_factor_index(is_not_prime, factor_index, max_factor_index)
+        PrimesSolution3.unsafe_clear_factors!(is_not_prime, factor_index, max_bits_index)
+        factor_index = PrimesSolution3.unsafe_find_next_factor_index(
+            is_not_prime, factor_index, max_factor_index
+        )
     end
     return is_not_prime
 end
@@ -111,7 +121,7 @@ end
     return @inbounds arr[_div_uint_size(zero_index) + 1] & (MainUInt(1) << _mod_uint_size(zero_index))
 end
 
-function count_primes(sieve::PrimeSieve1of2)
+function PrimesSolution3.count_primes(sieve::PrimeSieve1of2)
     arr = sieve.is_not_prime
     max_bits_index = _map_to_index(sieve.sieve_size)
     # Since we start clearing factors at 3, we include 2 in the count
@@ -125,7 +135,7 @@ function count_primes(sieve::PrimeSieve1of2)
     return count
 end
 
-function get_found_primes(sieve::PrimeSieve1of2)
+function PrimesSolution3.get_found_primes(sieve::PrimeSieve1of2)
     arr = sieve.is_not_prime
     sieve_size = sieve.sieve_size
     max_bits_index = _map_to_index(sieve_size)
