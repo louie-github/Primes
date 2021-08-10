@@ -1,64 +1,46 @@
-# Solution based on PrimeC/solution_2/sieve_1of2.c by Daniel Spångberg
-# 
-# While UInts are used as much as possible in the main code for
-# consistency, speed reasons, and to mimic sieve_1of2.c, most of the
-# defined functions accept any subtype of Integer so it's easier to
-# test them in the REPL, and also if we ever need to change `UInt` to
-# another type like `Int` for benchmarking purposes.
-# Julia compiles specialized code for each specific type anyway, so
-# we shouldn't see any significant slowdowns by doing this.
-# If you want to use purely UInts, you can simply replace all function
-# signatures containing `::Integer` to `::UInt` as well as patch the
-# count_primes and get_found_primes functions to use UInts.
+# Solution based on PrimeRust/solution_1 (FlagStorageBitVectorStripedBlocks)
+# by Michael Barber (@mike-barber).
 
-module Primes1of2
-export PrimeSieve1of2,
-       unsafe_find_next_factor_index,
-       unsafe_clear_factors!,
-       run_sieve!,
-       count_primes,
-       get_found_primes
+module PrimesStriped
+export PrimeSieveStripedBlocks
 
 import ..PrimesSolution3
- 
-const MainUInt = UInt32
-const _uint_bit_length = sizeof(MainUInt) * 8
-const _div_uint_size_shift = Int(log2(_uint_bit_length))
 
-# Functions like the ones defined below are also used in Julia's Base
-# library to speed up things such as Julia's native BitArray type.
+const MainUInt = UInt8
+const UINT_BIT_LENGTH = sizeof(MainUInt) * 8
+const BLOCK_SIZE = 16 * 1024
+const BLOCK_SIZE_BITS = BLOCK_SIZE * UINT_BIT_LENGTH
+
 @inline _mul2(i::Integer) = i << 1
 @inline _div2(i::Integer) = i >> 1
-# Map factor to index (3 => 1, 5 => 2, 7 => 3, ...) and vice versa.
 @inline _map_to_index(i::Integer) = _div2(i - 1)
 @inline _map_to_factor(i::Integer) = _mul2(i) + 1
-# This function also takes inspiration from Base._mod64 (bitarray.jl).
-@inline _mod_uint_size(i::Integer) = i & (_uint_bit_length - 1)
-@inline _div_uint_size(i::Integer) = i >> _div_uint_size_shift
-
-
-struct PrimeSieve1of2 <: PrimesSolution3.AbstractPrimeSieve
-    sieve_size::UInt
-    is_not_prime::Vector{MainUInt}
+# This is more accurate than _div_uint_size(_div2(i)) + 1
+# We only store odd numbers starting from 3, so we subtract 2 from i
+# to account for that.
+@inline function _get_num_blocks(i::Integer)
+    return (i - 2 + (2 * BLOCK_SIZE_BITS - 1)) ÷ TWO ÷ BLOCK_SIZE_BITS
 end
 
-# This is more accurate than _div_uint_size(_div2(i)) + 1
-@inline _get_num_uints(i::Integer) = _div_uint_size(
-    # We only store odd numbers starting from 3
-    _div2(
-        # Subtract 2 from i to account for the fact that the first
-        # index maps to 3, not 1.
-        i - 2 + (2 * _uint_bit_length - 1)
-    )
-)
 
-function PrimeSieve1of2(sieve_size::UInt)
-    return PrimeSieve1of2(sieve_size, zeros(MainUInt, _get_num_uints(sieve_size)))
+struct PrimeSieveStripedBlocks <: PrimesSolution3.AbstractPrimeSieve
+    sieve_size::UInt
+    length_bits::UInt
+    blocks::Vector{Vector{MainUInt}}
+end
+
+
+function PrimeSieveStripedBlocks(sieve_size::UInt)
+    return PrimeSieveStripedBlocks(
+        sieve_size,
+        _map_to_index(sieve_size),
+        [zeros(MainUInt, BLOCK_SIZE) for _ in 1:_get_num_blocks(sieve_size)]
+    )
 end
 
 # The main() function uses the UInt constructor; this is mostly useful
 # for testing in the REPL.
-PrimeSieve1of2(sieve_size::Int) = PrimeSieve1of2(UInt(sieve_size))
+PrimeSieveStripedBlocks(sieve_size::Int) = PrimeSieveStripedBlocks(UInt(sieve_size))
 
 
 @inline function PrimesSolution3.unsafe_find_next_factor_index(
@@ -83,21 +65,48 @@ PrimeSieve1of2(sieve_size::Int) = PrimeSieve1of2(UInt(sieve_size))
 end
 
 @inline function PrimesSolution3.unsafe_clear_factors!(
-    arr::Vector{<:Unsigned},
-    factor_index::Integer,
-    max_index::Integer
+    sieve::PrimeSieveStripedBlocks,
+    factor_index::Integer
 )
     factor = _map_to_factor(factor_index)
-    # This function also uses zero-based indexing calculations similar
-    # to unsafe_find_next_factor_index.
-    zero_index = _div2(factor * factor) - 1
-    @inbounds while zero_index < max_index
-        arr[_div_uint_size(zero_index) + 1] |= MainUInt(1) << _mod_uint_size(zero_index)
-        zero_index += factor
+    start = factor * factor ÷ 2 - 1
+    skip = factor
+    skip > BLOCK_SIZE && error("skip > BLOCK_SIZE; unsupported")
+
+    blocks = sieve.blocks
+    num_blocks = length(blocks)
+    block_idx_start = start ÷ BLOCK_SIZE_BITS
+    offset_idx = start % BLOCK_SIZE_BITS
+    bit_idx = offset_idx ÷ BLOCK_SIZE
+    word_idx = offset_idx % BLOCK_SIZE
+
+    @inbounds while block_idx < num_blocks
+        block = blocks[block_idx + 1]
+        while bit_idx < UINT_BIT_LENGTH
+            # Calculate length of current stripe, if it is less than
+            # BLOCK_SIZE, then we know that this should be the last
+            # iteration.
+            stripe_start_position = block_idx * BLOCK_SIZE_BITS + bit_idx * BLOCK_SIZE
+            effective_len = min(BLOCK_SIZE, sieve.length_bits - stripe_start_position)
+            mask = !(1 << bit_idx)
+            # TODO: Check if loop unrolling helps here.
+            while word_idx < effective_len
+                block[word_idx + 1] &= mask
+                word_idx += skip
+            end
+            # Last iteration
+            if effective_len != BLOCK_SIZE
+                return
+            end
+            bit_idx += 1
+            word_idx -= BLOCK_SIZE
+        end
+        bit_idx = 0
+        block_idx += 1
     end
 end
 
-function PrimesSolution3.run_sieve!(sieve::PrimeSieve1of2)
+function PrimesSolution3.run_sieve!(sieve::PrimeSieveStripedBlocks)
     is_not_prime = sieve.is_not_prime
     sieve_size = sieve.sieve_size
     max_bits_index = _map_to_index(sieve_size)
@@ -121,7 +130,7 @@ end
     return @inbounds arr[_div_uint_size(zero_index) + 1] & (MainUInt(1) << _mod_uint_size(zero_index))
 end
 
-function PrimesSolution3.count_primes(sieve::PrimeSieve1of2)
+function PrimesSolution3.count_primes(sieve::PrimeSieveStripedBlocks)
     arr = sieve.is_not_prime
     max_bits_index = _map_to_index(sieve.sieve_size)
     # Since we start clearing factors at 3, we include 2 in the count
@@ -135,7 +144,7 @@ function PrimesSolution3.count_primes(sieve::PrimeSieve1of2)
     return count
 end
 
-function PrimesSolution3.get_found_primes(sieve::PrimeSieve1of2)
+function PrimesSolution3.get_found_primes(sieve::PrimeSieveStripedBlocks)
     arr = sieve.is_not_prime
     sieve_size = sieve.sieve_size
     max_bits_index = _map_to_index(sieve_size)
