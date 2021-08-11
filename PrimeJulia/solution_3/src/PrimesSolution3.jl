@@ -80,6 +80,7 @@ function main(args::Vector{String}=ARGS)
     for implementation in IMPLEMENTATIONS
         println(stderr, "Benchmarking implementation: $(nameof(implementation))")
         benchmark_implementation(implementation, sieve_size, duration)
+        sleep(1)
         println(stderr)
     end
 end

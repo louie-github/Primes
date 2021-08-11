@@ -7,6 +7,12 @@ export PrimeSieveStripedBlocks
 import ..PrimesSolution3
 
 const MainUInt = UInt8
+# If MainUInt is longer than Int, the bit mask calculation in
+# clear_stripe (1 << bit_idx) won't work.
+# For some reason, 1 << bit_idx is faster than MainUInt(1) << bit_idx.
+if sizeof(MainUInt) > sizeof(Int)
+    error("MainUInt must not be larger than native UInt type.")
+end
 const UINT_BIT_LENGTH = sizeof(MainUInt) * 8
 const BLOCK_SIZE = 16 * 1024
 const BLOCK_SIZE_BITS = BLOCK_SIZE * UINT_BIT_LENGTH
@@ -67,6 +73,8 @@ end
 )
     # This loop calculates indices as if they are zero-based then adds
     # 1 when accessing the array since Julia uses 1-based indexing.
+    # This could be made faster by emulating the striped access instead
+    # of calculating the index each time via unsafe_get_bit_at_zero_index.
     zero_index = start_index
     @inbounds while zero_index < max_index
         if unsafe_get_bit_at_zero_index(sieve, zero_index)
@@ -79,6 +87,30 @@ end
     return max_index + 1
 end
 
+Base.@propagate_inbounds function clear_stripe!(
+    block::Vector{MainUInt},
+    word_idx::Integer,
+    skip::Integer,
+    mask::Integer,
+    end_index::Integer
+)
+    if end_index < (skip * 3)
+        end_index_minus_skip3 = end_index - (skip * 3)
+        while word_idx < end_index_minus_skip3
+            block[word_idx            + 1] &= mask
+            block[word_idx + skip     + 1] &= mask
+            block[word_idx + skip * 2 + 1] &= mask
+            block[word_idx + skip * 3 + 1] &= mask
+            word_idx += skip * 4
+        end
+    end
+    while word_idx < end_index
+        block[word_idx + 1] &= mask
+        word_idx += skip
+    end
+    return word_idx
+end
+
 function PrimesSolution3.unsafe_clear_factors!(
     sieve::PrimeSieveStripedBlocks,
     factor_index::Integer
@@ -86,7 +118,6 @@ function PrimesSolution3.unsafe_clear_factors!(
     factor = _map_to_factor(factor_index)
     start = factor * factor ÷ 2 - 1
     skip = factor
-    skip > BLOCK_SIZE && error("skip > BLOCK_SIZE; unsupported")
 
     blocks = sieve.blocks
     num_blocks = length(blocks)
@@ -95,58 +126,26 @@ function PrimesSolution3.unsafe_clear_factors!(
     bit_idx = offset_idx ÷ BLOCK_SIZE
     word_idx = offset_idx % BLOCK_SIZE
 
-    # Variables for unrolling loop
-    skip2 = skip * 2
-    skip3 = skip * 3
-    skip4 = skip * 4
-    BLOCK_SIZE_MINUS_SKIP3 = BLOCK_SIZE - skip3
-
     @inbounds while block_idx < num_blocks
         block = blocks[block_idx + 1]
         while bit_idx < UINT_BIT_LENGTH
             # Calculate length of current stripe, if it is less than
             # BLOCK_SIZE, then we know that this should be the last
             # iteration.
-            # For some reason, 1 << bit_idx is faster than
-            # MainUInt(1) << bit_idx.
-            mask = ~(1 << bit_idx)
             stripe_start_position = block_idx * BLOCK_SIZE_BITS + bit_idx * BLOCK_SIZE
             effective_len = sieve.length_bits - stripe_start_position
-            # Last iteration
+            mask = ~(1 << bit_idx)
             if effective_len < BLOCK_SIZE
-                unrolled_end_index = effective_len - skip3
-                if !(unrolled_end_index < effective_len)
-                    unrolled_end_index = 0
-                end
-                while word_idx < unrolled_end_index
-                    block[word_idx + 1] &= mask
-                    block[word_idx + skip + 1] &= mask
-                    block[word_idx + skip2 + 1] &= mask
-                    block[word_idx + skip3 + 1] &= mask
-                    word_idx += skip4
-                end
-                while word_idx < effective_len
-                    block[word_idx + 1] &= mask
-                    word_idx += skip
-                end
+                clear_stripe!(block, word_idx, skip, mask, effective_len)
                 return
             else
-                while word_idx < BLOCK_SIZE_MINUS_SKIP3
-                    block[word_idx + 1] &= mask
-                    block[word_idx + skip + 1] &= mask
-                    block[word_idx + skip2 + 1] &= mask
-                    block[word_idx + skip3 + 1] &= mask
-                    word_idx += skip4
-                end
-                while word_idx < BLOCK_SIZE
-                    block[word_idx + 1] &= mask
-                    word_idx += skip
-                end
+                word_idx = clear_stripe!(block, word_idx, skip, mask, BLOCK_SIZE)
             end
             bit_idx += 1
             word_idx -= BLOCK_SIZE
         end
-        bit_idx = 0
+        # Using zero function here so that bit_idx is type stable.
+        bit_idx = zero(bit_idx)
         block_idx += 1
     end
 end
@@ -168,7 +167,6 @@ end
 
 # These functions aren't optimized, but they aren't being benchmarked,
 # so it's fine.
-
 function PrimesSolution3.count_primes(sieve::PrimeSieveStripedBlocks)
     # Since we start clearing factors at 3, we include 2 in the count
     # beforehand.
