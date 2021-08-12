@@ -94,14 +94,16 @@ Base.@propagate_inbounds function clear_stripe!(
     mask::Integer,
     end_index::Integer
 )
-    if end_index < (skip * 3)
-        end_index_minus_skip3 = end_index - (skip * 3)
+    skip3 = skip * 3
+    skip4 = skip * 4
+    if end_index > skip3
+        end_index_minus_skip3 = end_index - skip3
         while word_idx < end_index_minus_skip3
             block[word_idx            + 1] &= mask
             block[word_idx + skip     + 1] &= mask
             block[word_idx + skip * 2 + 1] &= mask
             block[word_idx + skip * 3 + 1] &= mask
-            word_idx += skip * 4
+            word_idx += skip4
         end
     end
     while word_idx < end_index
@@ -121,32 +123,34 @@ function PrimesSolution3.unsafe_clear_factors!(
 
     blocks = sieve.blocks
     num_blocks = length(blocks)
-    block_idx = start ÷ BLOCK_SIZE_BITS
-    offset_idx = start % BLOCK_SIZE_BITS
-    bit_idx = offset_idx ÷ BLOCK_SIZE
-    word_idx = offset_idx % BLOCK_SIZE
+    length_bits = sieve.length_bits
 
-    @inbounds while block_idx < num_blocks
-        block = blocks[block_idx + 1]
-        while bit_idx < UINT_BIT_LENGTH
+    block_index = start ÷ BLOCK_SIZE_BITS
+    offset_index = start % BLOCK_SIZE_BITS
+    bit_index = offset_index ÷ BLOCK_SIZE
+    word_index = offset_index % BLOCK_SIZE
+
+    @inbounds while block_index < num_blocks
+        block = blocks[block_index + 1]
+        while bit_index < UINT_BIT_LENGTH
             # Calculate length of current stripe, if it is less than
             # BLOCK_SIZE, then we know that this should be the last
             # iteration.
-            stripe_start_position = block_idx * BLOCK_SIZE_BITS + bit_idx * BLOCK_SIZE
-            effective_len = sieve.length_bits - stripe_start_position
-            mask = ~(1 << bit_idx)
-            if effective_len < BLOCK_SIZE
-                clear_stripe!(block, word_idx, skip, mask, effective_len)
+            stripe_start_position = block_index * BLOCK_SIZE_BITS + bit_index * BLOCK_SIZE
+            effective_length = length_bits - stripe_start_position
+            mask = ~(1 << bit_index)
+            if effective_length < BLOCK_SIZE
+                clear_stripe!(block, word_index, skip, mask, effective_length)
                 return
             else
-                word_idx = clear_stripe!(block, word_idx, skip, mask, BLOCK_SIZE)
+                word_index = clear_stripe!(block, word_index, skip, mask, BLOCK_SIZE)
             end
-            bit_idx += 1
-            word_idx -= BLOCK_SIZE
+            bit_index += 1
+            word_index -= BLOCK_SIZE
         end
         # Using zero function here so that bit_idx is type stable.
-        bit_idx = zero(bit_idx)
-        block_idx += 1
+        bit_index = zero(bit_index)
+        block_index += 1
     end
 end
 
