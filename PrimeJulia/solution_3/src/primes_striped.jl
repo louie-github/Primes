@@ -90,16 +90,13 @@ Base.@propagate_inbounds function clear_stripe!(
     skip::Integer,
     mask::Integer,
 )
-    skip3 = skip * 3
-    skip4 = skip * 4
-    if BLOCK_SIZE > skip3
-        block_size_minus_skip3 = BLOCK_SIZE - skip3
-        while word_index < block_size_minus_skip3
+    if BLOCK_SIZE > (skip * 3)
+        while word_index < (BLOCK_SIZE - (skip * 3))
             block[word_index            + 1] &= mask
             block[word_index + skip     + 1] &= mask
             block[word_index + skip * 2 + 1] &= mask
             block[word_index + skip * 3 + 1] &= mask
-            word_index += skip4
+            word_index += skip * 4
         end
     end
     while word_index < BLOCK_SIZE
@@ -116,8 +113,7 @@ Base.@propagate_inbounds function clear_blocks!(
     word_index::Integer,
     skip::Integer
 )
-    max_block_index = length(blocks)
-    while block_index < max_block_index
+    while block_index < length(blocks)
         block = blocks[block_index + 1]
         while bit_index < BLOCKUINT_BIT_LENGTH
             mask = ~(1 << bit_index)
