@@ -7,4 +7,6 @@ COPY *.jl ./
 
 COPY src/ src/
 
+RUN [ "julia", "--project=.", "precompile.jl"]
+
 ENTRYPOINT [ "julia", "--project=.", "main.jl" ]
