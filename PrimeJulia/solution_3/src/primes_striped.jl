@@ -2,7 +2,7 @@
 # by Michael Barber (@mike-barber).
 
 module PrimesStriped
-export PrimeSieveStripedBlocks
+export PrimeSieveStripedBlocksWithExtraBits
 
 import ..PrimesSolution3
 
@@ -24,7 +24,7 @@ const BLOCK_SIZE_BITS = BLOCK_SIZE * BLOCKUINT_BIT_LENGTH
 @inline _map_to_index(i::Integer) = _div2(i - 1)
 @inline _map_to_factor(i::Integer) = _mul2(i) + 1
 
-struct PrimeSieveStripedBlocks <: PrimesSolution3.AbstractPrimeSieve
+struct PrimeSieveStripedBlocksWithExtraBits <: PrimesSolution3.AbstractPrimeSieve
     sieve_size::UInt
     total_bits::UInt
     blocks::Vector{Vector{BlockUInt}}
@@ -34,7 +34,7 @@ struct PrimeSieveStripedBlocks <: PrimesSolution3.AbstractPrimeSieve
 end
 
 
-function PrimeSieveStripedBlocks(sieve_size::UInt)
+function PrimeSieveStripedBlocksWithExtraBits(sieve_size::UInt)
     total_bits = (sieve_size - 1) ÷ 2
     num_blocks = total_bits ÷ BLOCK_SIZE_BITS
     total_blocks_bits = num_blocks * BLOCK_SIZE_BITS
@@ -42,7 +42,7 @@ function PrimeSieveStripedBlocks(sieve_size::UInt)
     # This is a little compliated.
     # sieve.blocks is a striped bit vector while sieve.extra_bits is an
     # inverted bit vector.
-    return PrimeSieveStripedBlocks(
+    return PrimeSieveStripedBlocksWithExtraBits(
         sieve_size,
         total_bits,
         [fill(typemax(BlockUInt), BLOCK_SIZE) for _ in 1:num_blocks],
@@ -57,10 +57,10 @@ end
 
 # The main() function uses the UInt constructor; this is mostly useful
 # for testing in the REPL.
-PrimeSieveStripedBlocks(sieve_size::Int) = PrimeSieveStripedBlocks(UInt(sieve_size))
+PrimeSieveStripedBlocksWithExtraBits(sieve_size::Int) = PrimeSieveStripedBlocksWithExtraBits(UInt(sieve_size))
 
 Base.@propagate_inbounds function unsafe_get_bit_at_zero_index(
-    sieve::PrimeSieveStripedBlocks, index::Integer
+    sieve::PrimeSieveStripedBlocksWithExtraBits, index::Integer
 )
     if index >= sieve.total_bits
         return false
@@ -81,7 +81,7 @@ Base.@propagate_inbounds function unsafe_get_bit_at_zero_index(
 end
 
 @inline unsafe_get_bit_at_index(
-    sieve::PrimeSieveStripedBlocks, index::Integer
+    sieve::PrimeSieveStripedBlocksWithExtraBits, index::Integer
 ) = unsafe_get_bit_at_zero_index(sieve, index - 1)
 
 Base.@propagate_inbounds function clear_stripe!(
@@ -146,7 +146,7 @@ Base.@propagate_inbounds function clear_extra_bits!(
 end
 
 function PrimesSolution3.unsafe_clear_factors!(
-    sieve::PrimeSieveStripedBlocks,
+    sieve::PrimeSieveStripedBlocksWithExtraBits,
     factor_index::Integer
 )
     factor = _map_to_factor(factor_index)
@@ -157,7 +157,6 @@ function PrimesSolution3.unsafe_clear_factors!(
         @inbounds clear_extra_bits!(
             sieve.extra_bits, start, skip, sieve.total_extra_bits
         )
-        return
     else
         block_index = start ÷ BLOCK_SIZE_BITS
         offset_index = start % BLOCK_SIZE_BITS
@@ -170,9 +169,10 @@ function PrimesSolution3.unsafe_clear_factors!(
             sieve.extra_bits, extra_start_index, skip, sieve.total_extra_bits
         )
     end
+    return nothing
 end
 
-function PrimesSolution3.run_sieve!(sieve::PrimeSieveStripedBlocks)
+function PrimesSolution3.run_sieve!(sieve::PrimeSieveStripedBlocksWithExtraBits)
     max_factor_index = _map_to_index(
         unsafe_trunc(UInt, sqrt(sieve.sieve_size))
     )
@@ -189,7 +189,7 @@ end
 
 # These functions aren't optimized, but they aren't being benchmarked,
 # so it's fine.
-function PrimesSolution3.count_primes(sieve::PrimeSieveStripedBlocks)
+function PrimesSolution3.count_primes(sieve::PrimeSieveStripedBlocksWithExtraBits)
     # Since we start clearing factors at 3, we include 2 in the count
     # beforehand.
     count = 1
@@ -201,7 +201,7 @@ function PrimesSolution3.count_primes(sieve::PrimeSieveStripedBlocks)
     return count
 end
 
-function PrimesSolution3.get_found_primes(sieve::PrimeSieveStripedBlocks)
+function PrimesSolution3.get_found_primes(sieve::PrimeSieveStripedBlocksWithExtraBits)
     output = [2]
     # Int(sieve_size) may overflow if sieve_size is too large (most
     # likely only a problem for 32-bit systems)

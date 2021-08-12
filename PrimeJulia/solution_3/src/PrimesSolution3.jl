@@ -11,7 +11,7 @@ export unsafe_find_next_factor_index,
        benchmark_implementation,
 # Exported implementations
         PrimeSieve1of2,
-        PrimeSieveStripedBlocks
+        PrimeSieveStripedBlocksWithExtraBits
 
 abstract type AbstractPrimeSieve end
 function unsafe_find_next_factor_index end
@@ -27,8 +27,7 @@ using .PrimesStriped
 
 const IMPLEMENTATIONS = [
     PrimeSieve1of2,
-    PrimeSieveStripedBlocks,
-    PrimeSieveStripedBlocksOverallocate,
+    PrimeSieveStripedBlocksWithExtraBits,
 ]
 const IMPLEMENTATION_NAMES = Set(string(i) for i in IMPLEMENTATIONS)
 
