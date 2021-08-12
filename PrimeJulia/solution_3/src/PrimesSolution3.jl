@@ -28,6 +28,7 @@ using .PrimesStriped
 const IMPLEMENTATIONS = [
     PrimeSieve1of2,
     PrimeSieveStripedBlocks,
+    PrimeSieveStripedBlocksOverallocate,
 ]
 const IMPLEMENTATION_NAMES = Set(string(i) for i in IMPLEMENTATIONS)
 
