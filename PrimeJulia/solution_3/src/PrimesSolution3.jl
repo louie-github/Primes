@@ -10,7 +10,8 @@ export unsafe_find_next_factor_index,
        AbstractPrimeSieve,
        benchmark_implementation,
 # Exported implementations
-        PrimeSieve1of2
+        PrimeSieve1of2,
+        PrimeSieveStripedBlocksWithExtraBits
 
 abstract type AbstractPrimeSieve end
 function unsafe_find_next_factor_index end
@@ -21,9 +22,12 @@ function get_found_primes(::AbstractPrimeSieve) end
 
 include("primes_1of2.jl")
 using .Primes1of2
+include("primes_striped.jl")
+using .PrimesStriped
 
 const IMPLEMENTATIONS = [
     PrimeSieve1of2,
+    PrimeSieveStripedBlocksWithExtraBits,
 ]
 const IMPLEMENTATION_NAMES = Set(string(i) for i in IMPLEMENTATIONS)
 
@@ -76,6 +80,7 @@ function main(args::Vector{String}=ARGS)
     for implementation in IMPLEMENTATIONS
         println(stderr, "Benchmarking implementation: $(nameof(implementation))")
         benchmark_implementation(implementation, sieve_size, duration)
+        sleep(1)
         println(stderr)
     end
 end
